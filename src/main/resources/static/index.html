@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Downloader</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 36px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .card-header h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    .badge-red   { background: #ff3b3b22; color: #ff6b6b; border: 1px solid #ff3b3b44; }
+    .badge-blue  { background: #3b82f622; color: #60a5fa; border: 1px solid #3b82f644; }
+
+    label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #666;
+      margin-bottom: 7px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 13px 16px;
+      font-size: 0.95rem;
+      color: #fff;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus { border-color: #ff3b3b; }
+    input[type="text"].playlist:focus { border-color: #3b82f6; }
+    input[type="text"]::placeholder { color: #3a3a3a; }
+
+    .formats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      margin-top: 18px;
+    }
+
+    .format-option { position: relative; }
+
+    .format-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+    }
+
+    .format-option label {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      background: #111;
+      border: 1px solid #2e2e2e;
+      border-radius: 10px;
+      padding: 11px 13px;
+      cursor: pointer;
+      font-size: 0.83rem;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: 0;
+      color: #aaa;
+      transition: all 0.2s;
+    }
+
+    .format-option label:hover { border-color: #555; color: #ddd; }
+
+    .format-option.red  input:checked + label { border-color: #ff3b3b; background: #1f0a0a; color: #fff; }
+    .format-option.blue input:checked + label { border-color: #3b82f6; background: #0a1020; color: #fff; }
+
+    .format-icon { font-size: 1rem; }
+
+    .btn {
+      margin-top: 22px;
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 0.97rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      color: #fff;
+    }
+
+    .btn-red  { background: #ff3b3b; }
+    .btn-blue { background: #3b82f6; }
+    .btn-red:hover:not(:disabled)  { background: #e03030; }
+    .btn-blue:hover:not(:disabled) { background: #2563eb; }
+    .btn:active:not(:disabled) { transform: scale(0.98); }
+    .btn:disabled { background: #2a2a2a; color: #555; cursor: not-allowed; }
+
+    .status-bar {
+      margin-top: 16px;
+      display: none;
+      align-items: center;
+      gap: 11px;
+    }
+    .status-bar.visible { display: flex; }
+
+    .spinner {
+      width: 17px;
+      height: 17px;
+      border: 2px solid #333;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    .spinner-red  { border-top-color: #ff3b3b; }
+    .spinner-blue { border-top-color: #3b82f6; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status-text { font-size: 0.88rem; color: #999; }
+
+    .log-box {
+      margin-top: 18px;
+      background: #0d0d0d;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 14px 16px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: 'Consolas', monospace;
+      font-size: 0.76rem;
+      line-height: 1.65;
+      display: none;
+    }
+    .log-box.visible { display: block; }
+
+    .log-line         { color: #555; }
+    .log-line.info    { color: #888; }
+    .log-line.progress{ color: #4fc3f7; }
+    .log-line.done    { color: #66bb6a; font-weight: bold; }
+    .log-line.error   { color: #ef5350; }
+
+    .save-btn {
+      display: none;
+      margin-top: 16px;
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 0.97rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+      transition: background 0.2s;
+      color: #fff;
+      background: #2e7d32;
+    }
+    .save-btn:hover  { background: #1b5e20; }
+    .save-btn.visible { display: block; }
+
+    .browser-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .browser-row label { margin: 0; white-space: nowrap; }
+
+    select {
+      flex: 1;
+      background: #111;
+      border: 1px solid #2e2e2e;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      color: #ccc;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    select:focus { border-color: #ff3b3b; }
+    select.playlist:focus { border-color: #3b82f6; }
+
+    .tip {
+      margin-top: 10px;
+      font-size: 0.75rem;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: #333;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #222;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+
+    <!-- ── Vídeo único ── -->
+    <div class="card">
+      <div class="card-header">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="9" fill="#ff3b3b"/>
+          <path d="M12 10l10 6-10 6V10z" fill="white"/>
+        </svg>
+        <h2>YouTube Downloader</h2>
+        <span class="badge badge-red">Vídeo</span>
+      </div>
+
+      <label for="urlInput">Link do vídeo</label>
+      <input type="text" id="urlInput" placeholder="https://www.youtube.com/watch?v=..." />
+
+      <div style="margin-top:18px">
+        <label>Formato</label>
+        <div class="formats">
+          <div class="format-option red">
+            <input type="radio" name="format" id="f1" value="DEFAULT" checked />
+            <label for="f1"><span class="format-icon">🎬</span> Melhor qualidade</label>
+          </div>
+          <div class="format-option red">
+            <input type="radio" name="format" id="f2" value="BEST_VIDEO" />
+            <label for="f2"><span class="format-icon">📺</span> MP4 (vídeo+áudio)</label>
+          </div>
+          <div class="format-option red">
+            <input type="radio" name="format" id="f3" value="AUDIO_ONLY" />
+            <label for="f3"><span class="format-icon">🎵</span> Somente MP3</label>
+          </div>
+          <div class="format-option red">
+            <input type="radio" name="format" id="f4" value="WORST_VIDEO" />
+            <label for="f4"><span class="format-icon">💾</span> Menor tamanho</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="browser-row">
+        <label>Navegador</label>
+        <select id="browserSelect">
+          <option value="none">Sem autenticação</option>
+          <option value="chrome">Chrome</option>
+          <option value="edge">Edge</option>
+          <option value="firefox" selected>Firefox</option>
+          <option value="brave">Brave</option>
+          <option value="opera">Opera</option>
+        </select>
+      </div>
+      <p class="tip">Usar o navegador resolve erros de "Sign in to confirm you're not a bot". O navegador precisa estar fechado ou com o YouTube aberto.</p>
+
+      <button class="btn btn-red" id="startBtn" onclick="startDownload()">Baixar vídeo</button>
+
+      <div class="status-bar" id="statusBar">
+        <div class="spinner spinner-red" id="spinner"></div>
+        <span class="status-text" id="statusText">Iniciando...</span>
+      </div>
+      <div class="log-box" id="logBox"></div>
+      <a class="save-btn" id="downloadBtn" href="#" download>Salvar arquivo</a>
+    </div>
+
+    <div class="divider">ou</div>
+
+    <!-- ── Playlist ── -->
+    <div class="card">
+      <div class="card-header">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="9" fill="#3b82f6"/>
+          <rect x="8" y="10" width="16" height="2" rx="1" fill="white"/>
+          <rect x="8" y="15" width="16" height="2" rx="1" fill="white"/>
+          <rect x="8" y="20" width="10" height="2" rx="1" fill="white"/>
+          <path d="M21 18l5 3-5 3v-6z" fill="white"/>
+        </svg>
+        <h2>Baixar Playlist</h2>
+        <span class="badge badge-blue">Todos os vídeos</span>
+      </div>
+
+      <label for="playlistInput">Link da playlist</label>
+      <input type="text" id="playlistInput" class="playlist"
+             placeholder="https://www.youtube.com/playlist?list=..." />
+
+      <div style="margin-top:18px">
+        <label>Formato</label>
+        <div class="formats">
+          <div class="format-option blue">
+            <input type="radio" name="plformat" id="p1" value="DEFAULT" checked />
+            <label for="p1"><span class="format-icon">🎬</span> Melhor qualidade</label>
+          </div>
+          <div class="format-option blue">
+            <input type="radio" name="plformat" id="p2" value="BEST_VIDEO" />
+            <label for="p2"><span class="format-icon">📺</span> MP4 (vídeo+áudio)</label>
+          </div>
+          <div class="format-option blue">
+            <input type="radio" name="plformat" id="p3" value="AUDIO_ONLY" />
+            <label for="p3"><span class="format-icon">🎵</span> Somente MP3</label>
+          </div>
+          <div class="format-option blue">
+            <input type="radio" name="plformat" id="p4" value="WORST_VIDEO" />
+            <label for="p4"><span class="format-icon">💾</span> Menor tamanho</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="browser-row">
+        <label>Navegador</label>
+        <select id="plBrowserSelect" class="playlist">
+          <option value="none">Sem autenticação</option>
+          <option value="chrome">Chrome</option>
+          <option value="edge">Edge</option>
+          <option value="firefox" selected>Firefox</option>
+          <option value="brave">Brave</option>
+          <option value="opera">Opera</option>
+        </select>
+      </div>
+      <p class="tip">Necessário para playlists. Certifique-se que está logado no YouTube no navegador selecionado.</p>
+
+      <button class="btn btn-blue" id="plStartBtn" onclick="startPlaylist()">Baixar playlist</button>
+
+      <div class="status-bar" id="plStatusBar">
+        <div class="spinner spinner-blue" id="plSpinner"></div>
+        <span class="status-text" id="plStatusText">Iniciando...</span>
+      </div>
+      <div class="log-box" id="plLogBox"></div>
+      <a class="save-btn" id="plDownloadBtn" href="#" download>Salvar ZIP</a>
+    </div>
+
+  </div>
+
+  <script>
+    let videoEs = null;
+    let playlistEs = null;
+
+    // ── Vídeo único ──────────────────────────────────────────────────────────
+
+    function startDownload() {
+      const url = document.getElementById('urlInput').value.trim();
+      if (!url) { alert('Cole o link do vídeo!'); return; }
+      const format = document.querySelector('input[name="format"]:checked').value;
+      const browser = document.getElementById('browserSelect').value;
+
+      resetSection('logBox', 'statusBar', 'downloadBtn', 'startBtn', 'statusText', 'spinner');
+      if (videoEs) videoEs.close();
+
+      videoEs = new EventSource(`/api/download?${new URLSearchParams({ url, format, browser })}`);
+
+      videoEs.addEventListener('progress', e => {
+        addLog('logBox', e.data, 'progress');
+        document.getElementById('statusText').textContent = parseStatus(e.data);
+      });
+
+      videoEs.addEventListener('done', e => {
+        videoEs.close();
+        finishSection('spinner', 'startBtn', 'statusText', 'downloadBtn', e.data, 'logBox', false);
+      });
+
+      videoEs.addEventListener('error', e => {
+        videoEs.close();
+        errorSection('spinner', 'startBtn', 'statusText', 'logBox', e.data);
+      });
+
+      videoEs.onerror = () => {
+        if (videoEs.readyState === EventSource.CLOSED) return;
+        videoEs.close();
+        errorSection('spinner', 'startBtn', 'statusText', 'logBox', 'Conexão perdida.');
+      };
+    }
+
+    // ── Playlist ─────────────────────────────────────────────────────────────
+
+    function startPlaylist() {
+      const url = document.getElementById('playlistInput').value.trim();
+      if (!url) { alert('Cole o link da playlist!'); return; }
+      const format = document.querySelector('input[name="plformat"]:checked').value;
+      const browser = document.getElementById('plBrowserSelect').value;
+
+      resetSection('plLogBox', 'plStatusBar', 'plDownloadBtn', 'plStartBtn', 'plStatusText', 'plSpinner');
+      if (playlistEs) playlistEs.close();
+
+      playlistEs = new EventSource(`/api/playlist?${new URLSearchParams({ url, format, browser })}`);
+
+      playlistEs.addEventListener('info', e => {
+        addLog('plLogBox', e.data, 'info');
+        document.getElementById('plStatusText').textContent = e.data;
+      });
+
+      playlistEs.addEventListener('progress', e => {
+        addLog('plLogBox', e.data, 'progress');
+        document.getElementById('plStatusText').textContent = parsePlaylistStatus(e.data);
+      });
+
+      playlistEs.addEventListener('done', e => {
+        playlistEs.close();
+        finishSection('plSpinner', 'plStartBtn', 'plStatusText', 'plDownloadBtn', e.data, 'plLogBox', true);
+      });
+
+      playlistEs.addEventListener('error', e => {
+        playlistEs.close();
+        errorSection('plSpinner', 'plStartBtn', 'plStatusText', 'plLogBox', e.data);
+      });
+
+      playlistEs.onerror = () => {
+        if (playlistEs.readyState === EventSource.CLOSED) return;
+        playlistEs.close();
+        errorSection('plSpinner', 'plStartBtn', 'plStatusText', 'plLogBox', 'Conexão perdida.');
+      };
+    }
+
+    // ── Utilitários ──────────────────────────────────────────────────────────
+
+    function resetSection(logId, statusBarId, saveBtnId, startBtnId, statusTextId, spinnerId) {
+      document.getElementById(logId).innerHTML = '';
+      document.getElementById(logId).classList.add('visible');
+      document.getElementById(statusBarId).classList.add('visible');
+      document.getElementById(saveBtnId).classList.remove('visible');
+      document.getElementById(startBtnId).disabled = true;
+      document.getElementById(statusTextId).textContent = 'Iniciando...';
+      document.getElementById(spinnerId).style.display = 'block';
+    }
+
+    function finishSection(spinnerId, startBtnId, statusTextId, saveBtnId, filename, logId, isZip) {
+      document.getElementById(spinnerId).style.display = 'none';
+      document.getElementById(startBtnId).disabled = false;
+      if (filename) {
+        document.getElementById(statusTextId).textContent = isZip
+          ? 'Concluído! Todos os vídeos baixados.'
+          : 'Concluído! Clique abaixo para salvar.';
+        const btn = document.getElementById(saveBtnId);
+        btn.href = `/api/file/${encodeURIComponent(filename)}`;
+        btn.textContent = isZip ? `Salvar ZIP: ${filename}` : `Salvar: ${filename}`;
+        btn.classList.add('visible');
+        addLog(logId, (isZip ? 'Playlist pronta: ' : 'Arquivo: ') + filename, 'done');
+        btn.click();
+      } else {
+        document.getElementById(statusTextId).textContent = 'Concluído!';
+        addLog(logId, 'Concluído.', 'done');
+      }
+    }
+
+    function errorSection(spinnerId, startBtnId, statusTextId, logId, msg) {
+      document.getElementById(spinnerId).style.display = 'none';
+      document.getElementById(startBtnId).disabled = false;
+      document.getElementById(statusTextId).textContent = 'Erro.';
+      addLog(logId, 'ERRO: ' + (msg || 'Falha desconhecida'), 'error');
+    }
+
+    function addLog(id, text, type = '') {
+      const box = document.getElementById(id);
+      const line = document.createElement('div');
+      line.className = 'log-line ' + type;
+      line.textContent = text;
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function parseStatus(line) {
+      const m = line.match(/(\d+[\.,]\d+)%/);
+      if (m) return `Baixando... ${m[1]}%`;
+      if (line.includes('Destination')) return 'Preparando arquivo...';
+      if (line.includes('[ffmpeg]') || line.includes('[ExtractAudio]')) return 'Convertendo...';
+      return 'Processando...';
+    }
+
+    function parsePlaylistStatus(line) {
+      const m = line.match(/Downloading item (\d+) of (\d+)/);
+      if (m) return `Baixando vídeo ${m[1]} de ${m[2]}...`;
+      const p = line.match(/(\d+[\.,]\d+)%/);
+      if (p) return `Progresso: ${p[1]}%`;
+      if (line.includes('Compactando')) return 'Compactando ZIP...';
+      if (line.includes('[ffmpeg]') || line.includes('[ExtractAudio]')) return 'Convertendo...';
+      return 'Processando...';
+    }
+
+    document.getElementById('urlInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') startDownload();
+    });
+    document.getElementById('playlistInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') startPlaylist();
+    });
+  </script>
+</body>
+</html>
