@@ -1,6 +1,8 @@
 target/
 downloads/
+tools/
 cookies.txt
+.claude/
 *.part
 *.mp4
 *.mp3

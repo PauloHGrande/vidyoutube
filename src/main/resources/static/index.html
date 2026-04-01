@@ -206,6 +206,99 @@
     .save-btn:hover  { background: #1b5e20; }
     .save-btn.visible { display: block; }
 
+    /* ── Fila ── */
+    .queue-input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 0;
+    }
+    .queue-input-row input { flex: 1; margin: 0; }
+    .btn-add {
+      flex-shrink: 0;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 10px;
+      padding: 0 18px;
+      font-size: 1.3rem;
+      color: #ccc;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      line-height: 1;
+    }
+    .btn-add:hover { background: #ff3b3b22; border-color: #ff3b3b66; color: #ff6b6b; }
+
+    .queue-list {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .queue-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 9px;
+      padding: 9px 12px;
+      font-size: 0.8rem;
+      transition: border-color 0.2s;
+    }
+    .queue-item.downloading { border-color: #ff3b3b55; background: #1f0a0a; }
+    .queue-item.done        { border-color: #2e7d3266; background: #0a1a0a; }
+    .queue-item.error       { border-color: #c6282866; background: #1a0a0a; }
+
+    .queue-icon { font-size: 1rem; flex-shrink: 0; width: 18px; text-align: center; }
+    .queue-url  { flex: 1; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .queue-item.downloading .queue-url { color: #ccc; }
+    .queue-item.done        .queue-url { color: #66bb6a; }
+    .queue-item.error       .queue-url { color: #ef5350; }
+
+    .queue-progress { font-size: 0.75rem; color: #ff6b6b; flex-shrink: 0; min-width: 42px; text-align: right; }
+    .queue-save { font-size: 0.75rem; color: #66bb6a; text-decoration: none; flex-shrink: 0; }
+    .queue-save:hover { text-decoration: underline; }
+    .queue-remove {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      color: #444;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0 2px;
+      transition: color 0.15s;
+    }
+    .queue-remove:hover { color: #ef5350; }
+
+    .queue-empty {
+      text-align: center;
+      color: #333;
+      font-size: 0.8rem;
+      padding: 14px 0 6px;
+    }
+
+    .queue-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .queue-actions .btn { margin: 0; flex: 1; }
+    .btn-clear {
+      flex-shrink: 0;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 0 16px;
+      font-size: 0.8rem;
+      color: #555;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-clear:hover:not(:disabled) { color: #ccc; border-color: #555; }
+    .btn-clear:disabled { cursor: not-allowed; }
+
     .browser-row {
       display: flex;
       align-items: center;
@@ -259,7 +352,7 @@
 <body>
   <div class="wrapper">
 
-    <!-- ── Vídeo único ── -->
+    <!-- ── Vídeo / Fila ── -->
     <div class="card">
       <div class="card-header">
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
@@ -267,11 +360,18 @@
           <path d="M12 10l10 6-10 6V10z" fill="white"/>
         </svg>
         <h2>YouTube Downloader</h2>
-        <span class="badge badge-red">Vídeo</span>
+        <span class="badge badge-red">Fila</span>
       </div>
 
-      <label for="urlInput">Link do vídeo</label>
-      <input type="text" id="urlInput" placeholder="https://www.youtube.com/watch?v=..." />
+      <label>Adicionar link à fila</label>
+      <div class="queue-input-row">
+        <input type="text" id="urlInput" placeholder="https://www.youtube.com/watch?v=..." />
+        <button class="btn-add" id="addBtn" onclick="addToQueue()" title="Adicionar">+</button>
+      </div>
+
+      <div id="queueList" class="queue-list">
+        <div class="queue-empty" id="queueEmpty">Nenhum vídeo na fila</div>
+      </div>
 
       <div style="margin-top:18px">
         <label>Formato</label>
@@ -292,6 +392,10 @@
             <input type="radio" name="format" id="f4" value="WORST_VIDEO" />
             <label for="f4"><span class="format-icon">💾</span> Menor tamanho</label>
           </div>
+          <div class="format-option red">
+            <input type="radio" name="format" id="f5" value="TV_COMPAT" />
+            <label for="f5"><span class="format-icon">📺</span> TV Compatível (H.264)</label>
+          </div>
         </div>
       </div>
 
@@ -306,16 +410,18 @@
           <option value="opera">Opera</option>
         </select>
       </div>
-      <p class="tip">Usar o navegador resolve erros de "Sign in to confirm you're not a bot". O navegador precisa estar fechado ou com o YouTube aberto.</p>
+      <p class="tip">Adicione quantos links quiser e clique em "Iniciar fila". Os vídeos serão baixados um a um.</p>
 
-      <button class="btn btn-red" id="startBtn" onclick="startDownload()">Baixar vídeo</button>
+      <div class="queue-actions">
+        <button class="btn btn-red" id="startBtn" onclick="startQueue()" disabled>Iniciar fila</button>
+        <button class="btn-clear" id="clearBtn" onclick="clearDone()" disabled>Limpar concluídos</button>
+      </div>
 
       <div class="status-bar" id="statusBar">
         <div class="spinner spinner-red" id="spinner"></div>
         <span class="status-text" id="statusText">Iniciando...</span>
       </div>
       <div class="log-box" id="logBox"></div>
-      <a class="save-btn" id="downloadBtn" href="#" download>Salvar arquivo</a>
     </div>
 
     <div class="divider">ou</div>
@@ -357,6 +463,10 @@
             <input type="radio" name="plformat" id="p4" value="WORST_VIDEO" />
             <label for="p4"><span class="format-icon">💾</span> Menor tamanho</label>
           </div>
+          <div class="format-option blue">
+            <input type="radio" name="plformat" id="p5" value="TV_COMPAT" />
+            <label for="p5"><span class="format-icon">📺</span> TV Compatível (H.264)</label>
+          </div>
         </div>
       </div>
 
@@ -389,39 +499,153 @@
     let videoEs = null;
     let playlistEs = null;
 
-    // ── Vídeo único ──────────────────────────────────────────────────────────
+    // ── Fila de vídeos ───────────────────────────────────────────────────────
 
-    function startDownload() {
-      const url = document.getElementById('urlInput').value.trim();
-      if (!url) { alert('Cole o link do vídeo!'); return; }
+    // Cada item: { url, status: 'pending'|'downloading'|'done'|'error', progress: '', filename: '' }
+    const queue = [];
+    let queueRunning = false;
+
+    function addToQueue() {
+      const input = document.getElementById('urlInput');
+      const url = input.value.trim();
+      if (!url) return;
+      if (!url.startsWith('http')) { alert('Cole um link válido!'); return; }
+      queue.push({ url, status: 'pending', progress: '', filename: '' });
+      input.value = '';
+      input.focus();
+      renderQueue();
+    }
+
+    function removeFromQueue(idx) {
+      if (queue[idx].status === 'downloading') return;
+      queue.splice(idx, 1);
+      renderQueue();
+    }
+
+    function clearDone() {
+      for (let i = queue.length - 1; i >= 0; i--) {
+        if (queue[i].status === 'done' || queue[i].status === 'error') queue.splice(i, 1);
+      }
+      renderQueue();
+    }
+
+    function renderQueue() {
+      const list = document.getElementById('queueList');
+      const empty = document.getElementById('queueEmpty');
+      const startBtn = document.getElementById('startBtn');
+      const clearBtn = document.getElementById('clearBtn');
+
+      // Remove itens anteriores mas mantém o empty placeholder
+      [...list.querySelectorAll('.queue-item')].forEach(el => el.remove());
+
+      if (queue.length === 0) {
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+        queue.forEach((item, idx) => {
+          const div = document.createElement('div');
+          div.className = 'queue-item ' + item.status;
+          div.id = 'qi-' + idx;
+
+          const icons = { pending: '⏳', downloading: '🔄', done: '✅', error: '❌' };
+          const shortUrl = item.url.length > 52 ? item.url.slice(0, 49) + '...' : item.url;
+
+          div.innerHTML = `
+            <span class="queue-icon">${icons[item.status]}</span>
+            <span class="queue-url" title="${item.url}">${shortUrl}</span>
+            ${item.status === 'downloading' && item.progress
+              ? `<span class="queue-progress">${item.progress}</span>` : ''}
+            ${item.status === 'done' && item.filename
+              ? `<a class="queue-save" href="/api/file/${encodeURIComponent(item.filename)}" download>Salvar</a>` : ''}
+            ${item.status === 'pending'
+              ? `<button class="queue-remove" onclick="removeFromQueue(${idx})" title="Remover">&times;</button>` : ''}
+          `;
+          list.appendChild(div);
+        });
+      }
+
+      const hasPending = queue.some(i => i.status === 'pending');
+      const hasDoneOrError = queue.some(i => i.status === 'done' || i.status === 'error');
+      startBtn.disabled = queueRunning || !hasPending;
+      clearBtn.disabled = !hasDoneOrError;
+    }
+
+    async function startQueue() {
+      if (queueRunning) return;
+      queueRunning = true;
+      document.getElementById('startBtn').disabled = true;
+
       const format = document.querySelector('input[name="format"]:checked').value;
       const browser = document.getElementById('browserSelect').value;
 
-      resetSection('logBox', 'statusBar', 'downloadBtn', 'startBtn', 'statusText', 'spinner');
-      if (videoEs) videoEs.close();
+      // Mostra barra de status global
+      document.getElementById('statusBar').classList.add('visible');
+      document.getElementById('logBox').innerHTML = '';
+      document.getElementById('logBox').classList.add('visible');
 
-      videoEs = new EventSource(`/api/download?${new URLSearchParams({ url, format, browser })}`);
+      for (let idx = 0; idx < queue.length; idx++) {
+        if (queue[idx].status !== 'pending') continue;
+        await downloadQueueItem(idx, format, browser);
+      }
 
-      videoEs.addEventListener('progress', e => {
-        addLog('logBox', e.data, 'progress');
-        document.getElementById('statusText').textContent = parseStatus(e.data);
+      queueRunning = false;
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('statusText').textContent = 'Fila concluída!';
+      renderQueue();
+    }
+
+    function downloadQueueItem(idx, format, browser) {
+      return new Promise(resolve => {
+        queue[idx].status = 'downloading';
+        renderQueue();
+
+        const total = queue.length;
+        document.getElementById('spinner').style.display = 'block';
+        document.getElementById('statusText').textContent = `Vídeo ${idx + 1} de ${total}...`;
+        addLog('logBox', `── Iniciando vídeo ${idx + 1} de ${total} ──`, 'info');
+
+        if (videoEs) videoEs.close();
+        videoEs = new EventSource(`/api/download?${new URLSearchParams({ url: queue[idx].url, format, browser })}`);
+
+        videoEs.addEventListener('progress', e => {
+          const pct = (e.data.match(/(\d+[\.,]\d+)%/) || [])[1];
+          if (pct) {
+            queue[idx].progress = pct + '%';
+            renderQueue();
+            document.getElementById('statusText').textContent = `Vídeo ${idx + 1} de ${total} — ${pct}%`;
+          }
+          addLog('logBox', e.data, 'progress');
+        });
+
+        videoEs.addEventListener('done', e => {
+          videoEs.close();
+          queue[idx].status = 'done';
+          queue[idx].filename = e.data;
+          queue[idx].progress = '';
+          addLog('logBox', 'Concluído: ' + e.data, 'done');
+          renderQueue();
+          resolve();
+        });
+
+        videoEs.addEventListener('error', e => {
+          videoEs.close();
+          queue[idx].status = 'error';
+          queue[idx].progress = '';
+          addLog('logBox', 'ERRO: ' + (e.data || 'falha desconhecida'), 'error');
+          renderQueue();
+          resolve();
+        });
+
+        videoEs.onerror = () => {
+          if (videoEs.readyState === EventSource.CLOSED) return;
+          videoEs.close();
+          queue[idx].status = 'error';
+          queue[idx].progress = '';
+          addLog('logBox', 'ERRO: Conexão perdida.', 'error');
+          renderQueue();
+          resolve();
+        };
       });
-
-      videoEs.addEventListener('done', e => {
-        videoEs.close();
-        finishSection('spinner', 'startBtn', 'statusText', 'downloadBtn', e.data, 'logBox', false);
-      });
-
-      videoEs.addEventListener('error', e => {
-        videoEs.close();
-        errorSection('spinner', 'startBtn', 'statusText', 'logBox', e.data);
-      });
-
-      videoEs.onerror = () => {
-        if (videoEs.readyState === EventSource.CLOSED) return;
-        videoEs.close();
-        errorSection('spinner', 'startBtn', 'statusText', 'logBox', 'Conexão perdida.');
-      };
     }
 
     // ── Playlist ─────────────────────────────────────────────────────────────
@@ -442,6 +666,10 @@
         document.getElementById('plStatusText').textContent = e.data;
       });
 
+      playlistEs.addEventListener('total', e => {
+        addLog('plLogBox', `Total: ${e.data} vídeos na playlist`, 'info');
+      });
+
       playlistEs.addEventListener('progress', e => {
         addLog('plLogBox', e.data, 'progress');
         document.getElementById('plStatusText').textContent = parsePlaylistStatus(e.data);
@@ -458,7 +686,10 @@
       });
 
       playlistEs.onerror = () => {
+        // Ignora erros quando a conexão fecha normalmente
         if (playlistEs.readyState === EventSource.CLOSED) return;
+        // Se ainda conectando, aguarda reconexão automática do EventSource
+        if (playlistEs.readyState === EventSource.CONNECTING) return;
         playlistEs.close();
         errorSection('plSpinner', 'plStartBtn', 'plStatusText', 'plLogBox', 'Conexão perdida.');
       };
@@ -511,14 +742,6 @@
       box.scrollTop = box.scrollHeight;
     }
 
-    function parseStatus(line) {
-      const m = line.match(/(\d+[\.,]\d+)%/);
-      if (m) return `Baixando... ${m[1]}%`;
-      if (line.includes('Destination')) return 'Preparando arquivo...';
-      if (line.includes('[ffmpeg]') || line.includes('[ExtractAudio]')) return 'Convertendo...';
-      return 'Processando...';
-    }
-
     function parsePlaylistStatus(line) {
       const m = line.match(/Downloading item (\d+) of (\d+)/);
       if (m) return `Baixando vídeo ${m[1]} de ${m[2]}...`;
@@ -530,7 +753,7 @@
     }
 
     document.getElementById('urlInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') startDownload();
+      if (e.key === 'Enter') addToQueue();
     });
     document.getElementById('playlistInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') startPlaylist();

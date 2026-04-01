@@ -39,11 +39,26 @@ public class DownloadController {
     private ProcessBuilder createProcess(List<String> command) {
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(true);
-        // Garante que o PATH do sistema inclui o Node.js
-        String currentPath = pb.environment().getOrDefault("PATH", "");
+
+        String currentPath = pb.environment().getOrDefault("PATH",
+                pb.environment().getOrDefault("Path", ""));
+
+        StringBuilder extra = new StringBuilder();
+
+        // Node.js
         if (!currentPath.contains("nodejs")) {
-            pb.environment().put("PATH", NODE_PATHS + ";" + currentPath);
+            extra.append(NODE_PATHS).append(";");
         }
+
+        // ffmpeg local (baixado automaticamente pelo DependencySetup)
+        if (Files.exists(DependencySetup.FFMPEG_BIN)) {
+            extra.append(DependencySetup.FFMPEG_BIN.toAbsolutePath()).append(";");
+        }
+
+        if (!extra.isEmpty()) {
+            pb.environment().put("PATH", extra + currentPath);
+        }
+
         return pb;
     }
 
@@ -125,13 +140,24 @@ public class DownloadController {
 
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                     String line;
+                    boolean totalSent = false;
                     while ((line = reader.readLine()) != null) {
                         String t = line.trim();
-                        if (t.contains("[download]") || t.contains("[ffmpeg]")
-                                || t.contains("[ExtractAudio]") || t.contains("Destination")
-                                || t.contains("Downloading item") || t.contains("ERROR")
-                                || t.contains("WARNING")) {
-                            emitter.send(SseEmitter.event().name("progress").data(t));
+
+                        // Captura o total de vídeos da primeira linha "Downloading item X of Y"
+                        if (!totalSent && t.contains("Downloading item")) {
+                            java.util.regex.Matcher m = java.util.regex.Pattern
+                                    .compile("Downloading item \\d+ of (\\d+)").matcher(t);
+                            if (m.find()) {
+                                try { emitter.send(SseEmitter.event().name("total").data(m.group(1))); }
+                                catch (Exception ignored) {}
+                                totalSent = true;
+                            }
+                        }
+
+                        if (!t.isEmpty()) {
+                            try { emitter.send(SseEmitter.event().name("progress").data(t)); }
+                            catch (Exception ignored) {}
                         }
                     }
                 }
@@ -212,6 +238,14 @@ public class DownloadController {
         cmd.add("--newline");
         cmd.add("--yes-playlist");
         cmd.add("--ignore-errors");
+        cmd.add("--retries");
+        cmd.add("5");
+        cmd.add("--fragment-retries");
+        cmd.add("5");
+        cmd.add("--sleep-interval");
+        cmd.add("2");
+        cmd.add("--max-sleep-interval");
+        cmd.add("5");
         cmd.add("--js-runtimes");
         cmd.add("node");
         addBrowser(cmd, browser);
@@ -237,16 +271,10 @@ public class DownloadController {
 
     private void applyFormat(List<String> cmd, String format) {
         switch (format) {
-            case "DEFAULT" -> {
-                // Prefere mp4 com vídeo+áudio já embutidos, fallback para merge com ffmpeg
-                cmd.add("-f");
-                cmd.add("bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best");
-                cmd.add("--merge-output-format");
-                cmd.add("mp4");
-            }
             case "BEST_VIDEO" -> {
+                // Requer ffmpeg para merge — usa se ffmpeg disponível, senão pré-mesclado
                 cmd.add("-f");
-                cmd.add("bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best");
+                cmd.add("bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best[vcodec!=none][acodec!=none]");
                 cmd.add("--merge-output-format");
                 cmd.add("mp4");
             }
@@ -259,7 +287,24 @@ public class DownloadController {
             }
             case "WORST_VIDEO" -> {
                 cmd.add("-f");
-                cmd.add("worstvideo+worstaudio/worst");
+                cmd.add("worst[vcodec!=none][acodec!=none]/worst");
+            }
+            case "TV_COMPAT" -> {
+                // H.264 + AAC em MP4 — prioriza streams já em H.264 para evitar re-encoding
+                cmd.add("-f");
+                cmd.add("bestvideo[vcodec^=avc1][height<=1080]+bestaudio[acodec^=mp4a]/bestvideo[vcodec^=avc][height<=1080]+bestaudio/bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best");
+                cmd.add("--merge-output-format");
+                cmd.add("mp4");
+                cmd.add("--postprocessor-args");
+                // Copia vídeo se já for H.264; apenas re-codifica áudio para AAC se necessário
+                cmd.add("ffmpeg:-c:v copy -c:a aac -b:a 128k -movflags +faststart");
+            }
+            default -> {
+                // Melhor formato com vídeo+áudio, usa ffmpeg para merge se disponível
+                cmd.add("-f");
+                cmd.add("bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best[vcodec!=none][acodec!=none]/best");
+                cmd.add("--merge-output-format");
+                cmd.add("mp4");
             }
         }
     }
